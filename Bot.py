@@ -7,7 +7,7 @@ import asyncio
 # 🔴 CONFIG
 TOKEN = "TU_TOKEN_BOT"
 TON_WALLET = "UQDYM7ld7G-HyC2jiFDVWOZ42qzMe93lsf6uO8pSlqAOTO4P"
-ADMIN_ID = 123456789
+ADMIN_ID = 7671435882
 TOKEN_NAME = "YOR"
 
 API_URL = "https://toncenter.com/api/v2/getTransactions"
