@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler
 
 # 🔐 CONFIG
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("8624104189:AAGug4bXV1Y22RvzZDWS248USG4hCq37j48")
 TON_WALLET = "UQDYM7ld7G-HyC2jiFDVWOZ42qzMe93lsf6uO8pSlqAOTO4P"
 ADMIN_ID = 7671435882
 TOKEN_NAME = "YOR"
