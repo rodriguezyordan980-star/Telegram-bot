@@ -5,6 +5,7 @@ import asyncio
 import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # 🔐 CONFIG
 TOKEN = os.getenv("TOKEN")
@@ -191,13 +192,29 @@ async def ranking(update: Update, context):
 
 # /shop
 async def shop(update: Update, context):
-    text = "🛒 BOOSTS\n\n"
+    user_id = update.effective_user.id
+
+    keyboard = []
+
     for k, v in boosts.items():
-        text += f"{k}. x{v['mult']} → {v['price']} TON\n"
+        amount = int(v["price"] * 1e9)  # TON a nanotons
 
-    text += "\nEnviar TON con:\nID-NIVEL"
+        url = f"https://app.tonkeeper.com/transfer/{TON_WALLET}?amount={amount}&text={user_id}-{k}"
 
-    await update.message.reply_text(text)
+        keyboard.append([
+            InlineKeyboardButton(
+                f"x{v['mult']} → {v['price']} TON",
+                url=url
+            )
+        ])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🛒 COMPRA BOOSTS\n\n"
+        "Pulsa un botón para pagar directamente 👇",
+        reply_markup=reply_markup
+                                              )
 
 # /status
 async def status(update: Update, context):
