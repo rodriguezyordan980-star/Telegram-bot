@@ -220,8 +220,11 @@ app.add_handler(CommandHandler("ranking", ranking))
 app.add_handler(CommandHandler("shop", shop))
 app.add_handler(CommandHandler("status", status))
 
-app.job_queue.run_once(lambda ctx: asyncio.create_task(payment_watcher(app)), 1)
-app.job_queue.run_once(lambda ctx: asyncio.create_task(finish_event(app)), 1)
+async def start_background_tasks(app):
+    asyncio.create_task(payment_watcher(app))
+    asyncio.create_task(finish_event(app))
+
+app.post_init = start_background_tasks
 
 print("BOT PRO ACTIVO")
 app.run_polling()
