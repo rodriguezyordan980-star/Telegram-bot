@@ -126,8 +126,12 @@ async def finish_event(app):
 
                 try:
                     await app.bot.send_message(
-                        chat_id=int(user),
-                        text=f"💸 Ganaste {round(amount,4)} TON"
+    chat_id=int(user),
+    text=(
+        "🎉 EVENTO FINALIZADO\n\n"
+        f"💰 Ganaste: {round(amount,4)} TON\n\n"
+        "Gracias por participar 🚀"
+    )
                     )
                 except:
                     pass
