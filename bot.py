@@ -137,10 +137,18 @@ async def finish_event(app):
 # /start
 async def start(update: Update, context):
     await update.message.reply_text(
-        "🚀 EVENTO ACTIVO\n\n"
+        "🚀 EVENTO ACTIVO (15 días)\n\n"
         "⛏ Mina tokens GRATIS\n"
         "💰 Gana TON real\n\n"
-        "/mine /balance /shop /ranking /status"
+        "📌 IMPORTANTE:\n"
+        "Los retiros se realizan SOLO al final del evento\n\n"
+        "📈 Mientras más tokens tengas → mayor ganancia\n\n"
+        "Comandos:\n"
+        "/mine\n"
+        "/balance\n"
+        "/shop\n"
+        "/ranking\n"
+        "/status"
     )
 
 # /mine
