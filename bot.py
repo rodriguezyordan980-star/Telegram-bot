@@ -190,8 +190,18 @@ async def mine(update: Update, context):
 # /balance
 async def balance(update: Update, context):
     user = str(update.effective_user.id)
+    user_tokens = data["balances"].get(user, 0)
+
+    if data["total_tokens"] > 0:
+        share = user_tokens / data["total_tokens"]
+        estimate = data["withdraw_pool"] * share
+    else:
+        estimate = 0
+
     await update.message.reply_text(
-        f"{round(data['balances'].get(user,0),2)} {TOKEN_NAME}"
+        f"🪙 {round(user_tokens,2)} {TOKEN_NAME}\n"
+        f"💰 Ganancia estimada: {round(estimate,4)} TON\n\n"
+        "⏳ Se paga al final del evento"
     )
 
 # /ranking
