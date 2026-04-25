@@ -175,7 +175,8 @@ async def mine(update: Update, context):
     save()
 
     await update.message.reply_text(
-        f"⛏ +{round(reward,2)} {TOKEN_NAME}\n⚡ Mejora en /shop"
+    f"⛏ +{round(reward,2)} {TOKEN_NAME}\n\n"
+    "⚡ Compra boost en /shop para ganar más del pool"
     )
 
 # /balance
