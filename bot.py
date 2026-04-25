@@ -93,8 +93,13 @@ async def payment_watcher(app):
                                 save()
 
                                 await app.bot.send_message(
-                                    chat_id=user_id,
-                                    text=f"🚀 Boost x{b['mult']} activado"
+                                    chat_id=int(user_id),
+                                    text=(
+                                        f"✅ PAGO CONFIRMADO\n\n"
+                                        f"🚀 Boost x{b['mult']} activado\n"
+                                        f"💰 Pagado: {value} TON\n\n"
+                                        "🔥 Ya estás minando más rápido"
+                                    )
                                 )
 
                 except:
