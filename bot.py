@@ -520,3 +520,198 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 T[l]["tasks_empty"],
                 parse_mode="Markdown",
                 reply_markup=ba
+                       = lang(uid)
+
+        if not tasks:
+            await q.edit_message_text(
+                T[l]["tasks_empty"],
+                parse_mode="Markdown",
+                reply_markup=back_btn(uid)
+            )
+            return
+
+        text = T[l]["tasks_title"]
+        kb   = []
+
+        for i, task in enumerate(tasks, 1):
+            ch     = task["channel"]
+            reward = task["reward"]
+            done   = ch in done_list
+            status = T[l]["task_done_label"] if done else "🔲"
+            text  += f"{status} *Tarea {i}:* Únete a {ch} → +{reward} YOR\n"
+
+            if not done:
+                kb.append([
+                    InlineKeyboardButton(
+                        T[l]["task_join_btn"].format(n=i),
+                        url=task["link"]
+                    ),
+                    InlineKeyboardButton(
+                        T[l]["task_verify_btn"].format(n=i),
+                        callback_data=f"verify_{i-1}"
+                    ),
+                ])
+
+        text += f"\n👥 *Referidos:* +{TASK_REF_REWARD} YOR por cada amigo"
+        kb.append([InlineKeyboardButton(T[l]["btn_referral"], callback_data="referral")])
+        kb.append([InlineKeyboardButton(T[l]["btn_back"],     callback_data="menu")])
+
+        await q.edit_message_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
+        return
+
+    if cd.startswith("verify_"):
+        try:
+            idx  = int(cd.split("_")[1])
+            task = data["paid_tasks"][idx]
+        except (IndexError, ValueError):
+            await q.edit_message_text("❌ Tarea no encontrada.", reply_markup=back_btn(uid))
+            return
+
+        channel   = task["channel"]
+        reward    = task["reward"]
+        done_list = data["task_done"].get(uid, [])
+
+        if channel in done_list:
+            await q.answer(tx(uid, "task_already"), show_alert=True)
+            return
+
+        try:
+            member    = await context.bot.get_chat_member(channel, int(uid))
+            is_member = member.status in ("member", "administrator", "creator")
+        except Exception:
+            is_member = False
+
+        if is_member:
+            done_list.append(channel)
+            data["task_done"][uid]  = done_list
+            data["balances"][uid]   = round(data["balances"].get(uid, 0) + reward, 2)
+            data["total_tokens"]    = round(data["total_tokens"] + reward, 2)
+            save()
+            await q.edit_message_text(
+                tx(uid, "task_channel_ok", r=reward, ch=channel),
+                parse_mode="Markdown",
+                reply_markup=back_btn(uid)
+            )
+        else:
+            l  = lang(uid)
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(T[l]["task_join_btn"].format(n=idx+1),   url=task["link"])],
+                [InlineKeyboardButton(T[l]["task_verify_btn"].format(n=idx+1), callback_data=cd)],
+                [InlineKeyboardButton(T[l]["btn_back"],                         callback_data="tasks")],
+            ])
+            await q.edit_message_text(tx(uid, "task_channel_no"), reply_markup=kb)
+        return
+
+    if cd == "referral":
+        bot_info = await context.bot.get_me()
+        link     = f"https://t.me/{bot_info.username}?start={uid}"
+        count    = data["ref_count"].get(uid, 0)
+        await q.edit_message_text(
+            tx(uid, "ref_title", link=link, r=TASK_REF_REWARD, count=count),
+            parse_mode="Markdown",
+            reply_markup=back_btn(uid)
+        )
+        return
+
+# ─────────────────────────────────────────
+# 🔍 WATCHER DE PAGOS
+# ─────────────────────────────────────────
+async def payment_watcher(app):
+    while True:
+        try:
+            r   = requests.get(API_URL, params={"address": TON_WALLET, "limit": 20}, timeout=10)
+            txs = r.json().get("result", [])
+
+            for transaction in txs:
+                try:
+                    msg   = transaction["in_msg"].get("message", "")
+                    value = int(transaction["in_msg"]["value"]) / 1e9
+                    tx_id = transaction["transaction_id"]["hash"]
+
+                    if tx_id in data["processed"]:
+                        continue
+
+                    if msg and "-" in msg:
+                        parts = msg.split("-")
+                        if len(parts) != 2:
+                            continue
+                        uid_str, lvl_str = parts
+                        if not uid_str.isdigit() or not lvl_str.isdigit():
+                            continue
+
+                        user_id = uid_str
+                        level   = int(lvl_str)
+
+                        if level not in boosts:
+                            continue
+                        b = boosts[level]
+                        if value < b["price"]:
+                            continue
+
+                        data["processed"].append(tx_id)
+                        data["user_boost"][user_id] = [b["mult"], time.time() + b["time"]]
+                        data["withdraw_pool"] += value * 0.5
+                        data["owner_profit"]  += value * 0.3
+                        data["event_reserve"] += value * 0.2
+                        save()
+
+                        await app.bot.send_message(
+                            chat_id=int(user_id),
+                            text=tx(user_id, "boost_ok", m=b["mult"], v=round(value, 4)),
+                            parse_mode="Markdown"
+                        )
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        await asyncio.sleep(10)
+
+# ─────────────────────────────────────────
+# 🏁 FIN DEL EVENTO
+# ─────────────────────────────────────────
+async def finish_event(app):
+    global event_finished
+    while True:
+        if not event_finished and time.time() > event_end_time:
+            event_finished = True
+            total = data["total_tokens"]
+            for user, tokens in data["balances"].items():
+                if tokens == 0:
+                    continue
+                share  = tokens / total if total > 0 else 0
+                amount = round(data["withdraw_pool"] * share, 4)
+                try:
+                    await app.bot.send_message(
+                        chat_id=int(user),
+                        text=tx(user, "event_end_msg", amt=amount),
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+        await asyncio.sleep(30)
+
+# ─────────────────────────────────────────
+# 🚀 ARRANQUE
+# ─────────────────────────────────────────
+async def on_startup(app):
+    asyncio.create_task(payment_watcher(app))
+    asyncio.create_task(finish_event(app))
+
+application = ApplicationBuilder().token(TOKEN).build()
+
+application.add_handler(CommandHandler("start",      cmd_start))
+application.add_handler(CommandHandler("admin",      cmd_admin))
+application.add_handler(CommandHandler("addtask",    cmd_addtask))
+application.add_handler(CommandHandler("removetask", cmd_removetask))
+application.add_handler(CommandHandler("listtasks",  cmd_listtasks))
+application.add_handler(CallbackQueryHandler(on_callback))
+
+application.post_init = on_startup
+
+print("✅ YOR Mining Bot ACTIVO")
+application.run_polling()
