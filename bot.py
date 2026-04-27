@@ -5,31 +5,31 @@ import asyncio
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    ContextTypes, MessageHandler, filters
 )
 
 # ─────────────────────────────────────────
 # 🔐 CONFIG
 # ─────────────────────────────────────────
-TOKEN        = os.getenv("TOKEN")
-TON_WALLET   = "UQDYM7ld7G-HyC2jiFDVWOZ42qzMe93lsf6uO8pSlqAOTO4P"
-ADMIN_ID     = 7671435882
-TOKEN_NAME   = "YOR"
-CHANNEL_ID   = "@tu_canal"          # ← Cambia esto por tu canal real
-CHANNEL_LINK = "https://t.me/tu_canal"  # ← Y este enlace también
+TOKEN      = os.getenv("TOKEN")
+TON_WALLET = "UQDYM7ld7G-HyC2jiFDVWOZ42qzMe93lsf6uO8pSlqAOTO4P"
+ADMIN_ID   = 7671435882
+TOKEN_NAME = "YOR"
 
-API_URL   = "https://toncenter.com/api/v2/getTransactions"
-DATA_FILE = "data.json"
+API_URL        = "https://toncenter.com/api/v2/getTransactions"
+DATA_FILE      = "data.json"
+EVENT_DURATION = 15 * 24 * 60 * 60
 
-EVENT_DURATION = 15 * 24 * 60 * 60  # 15 días en segundos
+TASK_REF_REWARD = 20  # YOR por referido
 
 # ─────────────────────────────────────────
-# 🌐 TEXTOS MULTILENGUAJE
+# 🌐 TEXTOS
 # ─────────────────────────────────────────
 T = {
     "es": {
-        "choose_lang":      "🌐 Elige tu idioma / Choose your language:",
-        "welcome":          (
+        "choose_lang":     "🌐 Elige tu idioma / Choose your language:",
+        "welcome":         (
             "👋 ¡Bienvenido a *YOR Mining Bot*!\n\n"
             "⛏ Mina tokens YOR gratis\n"
             "💰 Gana TON real al final del evento\n"
@@ -37,42 +37,60 @@ T = {
             "📌 Los retiros se realizan *solo al final del evento*\n\n"
             "Usa el menú de abajo 👇"
         ),
-        "menu_title":       "📋 *Menú principal*\nElige una opción:",
-        "mine_cooldown":    "⏳ Espera *{s}s* para volver a minar",
-        "mine_success":     "⛏ +*{r}* {t}\n\n⚡ Compra un boost en la Tienda para ganar más",
-        "mine_event_over":  "❌ El evento ya terminó",
-        "balance_msg":      "🪙 *Tus tokens:* {tok} {t}\n💰 *Ganancia estimada:* {est} TON\n\n⏳ Se paga al final del evento",
-        "status_msg":       "📊 *Estado del evento*\n\n💰 Pool total: {pool} TON\n🪙 Tokens minados: {total}\n⏳ Tiempo restante: {tiempo}",
-        "ranking_title":    "🏆 *TOP 10 mineros*\n\n",
-        "ranking_row":      "{i}. `{u}` → {a} YOR\n",
-        "shop_title":       "🛒 *Tienda de Boosts*\n\nElige tu boost y paga directo desde Tonkeeper 👇",
-        "tasks_title":      "📋 *Tareas disponibles*\n\nCompleta tareas para ganar YOR extra:",
-        "task_channel":     "✅ Unirse al canal oficial (+{r} YOR)",
-        "task_ref":         "👥 Invitar amigos (+{r} YOR por cada uno)",
-        "task_done":        "✅ Ya completaste esta tarea",
-        "task_channel_ok":  "🎉 ¡Tarea completada! +{r} {t} por unirte al canal",
-        "task_channel_no":  "❌ Aún no estás en el canal. Únete primero y vuelve a verificar.",
-        "ref_title":        "👥 *Tu enlace de referido:*\n\n`{link}`\n\n💰 Ganas *{r} YOR* por cada amigo que se una\n👤 Referidos totales: {count}",
-        "ref_bonus":        "🎉 ¡{name} se unió con tu enlace! +{r} {t}",
-        "event_end_msg":    "🎉 *EVENTO FINALIZADO*\n\n💰 Ganaste: *{amt} TON*\n\nGracias por participar 🚀",
-        "boost_ok":         "✅ *Pago confirmado*\n\n🚀 Boost x{m} activado\n💰 Pagado: {v} TON\n\n🔥 Estás minando más rápido",
-        "admin_stats":      "🛠 *Admin Stats*\n\nPool retiros: {pool} TON\nGanancia dueño: {profit} TON\nReserva evento: {res} TON\nUsuarios: {users}\nTotal tokens: {total}",
-        "lang_set":         "✅ Idioma establecido: Español",
-        "btn_mine":         "⛏ Minar",
-        "btn_balance":      "💰 Balance",
-        "btn_shop":         "🛒 Tienda",
-        "btn_tasks":        "📋 Tareas",
-        "btn_ranking":      "🏆 Ranking",
-        "btn_status":       "📊 Estado",
-        "btn_referral":     "👥 Referidos",
-        "btn_verify":       "✅ Verificar",
-        "btn_join":         "📢 Unirse al canal",
-        "btn_back":         "🔙 Volver",
-        "btn_lang":         "🌐 Idioma",
+        "menu_title":      "📋 *Menú principal*\nElige una opción:",
+        "mine_cooldown":   "⏳ Espera *{s}s* para volver a minar",
+        "mine_success":    "⛏ +*{r}* {t}\n\n⚡ Compra un boost en la Tienda para ganar más",
+        "mine_event_over": "❌ El evento ya terminó",
+        "balance_msg":     "🪙 *Tus tokens:* {tok} {t}\n💰 *Ganancia estimada:* {est} TON\n\n⏳ Se paga al final del evento",
+        "status_msg":      "📊 *Estado del evento*\n\n💰 Pool total: {pool} TON\n🪙 Tokens minados: {total}\n⏳ Tiempo restante: {tiempo}",
+        "ranking_title":   "🏆 *TOP 10 mineros*\n\n",
+        "ranking_row":     "{i}. `{u}` → {a} YOR\n",
+        "shop_title":      "🛒 *Tienda de Boosts*\n\nElige tu boost y paga directo desde Tonkeeper 👇",
+        "tasks_title":     "📋 *Tareas disponibles*\n\nCompleta tareas y gana YOR extra:\n\n",
+        "tasks_empty":     "📋 *Tareas*\n\nNo hay tareas disponibles por ahora.\nVuelve pronto 👀",
+        "task_ref":        "👥 Invitar amigos (+{r} YOR por cada uno)",
+        "task_done_label": "☑️",
+        "task_verify_btn": "✅ Verificar #{n}",
+        "task_join_btn":   "📢 Unirse #{n}",
+        "task_channel_ok": "🎉 ¡Tarea completada! +*{r} YOR* por unirte a {ch}",
+        "task_channel_no": "❌ Aún no estás en el canal.\nÚnete primero y vuelve a verificar.",
+        "task_already":    "✅ Ya completaste esta tarea",
+        "ref_title":       "👥 *Tu enlace de referido:*\n\n`{link}`\n\n💰 Ganas *{r} YOR* por cada amigo\n👤 Referidos: {count}",
+        "ref_bonus":       "🎉 ¡{name} se unió con tu enlace! +{r} {t}",
+        "event_end_msg":   "🎉 *EVENTO FINALIZADO*\n\n💰 Ganaste: *{amt} TON*\n\nGracias por participar 🚀",
+        "boost_ok":        "✅ *Pago confirmado*\n\n🚀 Boost x{m} activado\n💰 Pagado: {v} TON\n\n🔥 Estás minando más rápido",
+        "lang_set":        "✅ Idioma: Español",
+        "btn_mine":        "⛏ Minar",
+        "btn_balance":     "💰 Balance",
+        "btn_shop":        "🛒 Tienda",
+        "btn_tasks":       "📋 Tareas",
+        "btn_ranking":     "🏆 Ranking",
+        "btn_status":      "📊 Estado",
+        "btn_referral":    "👥 Referidos",
+        "btn_back":        "🔙 Volver",
+        "btn_lang":        "🌐 Idioma",
+        "admin_stats":     (
+            "🛠 *Admin Panel*\n\n"
+            "💰 Pool retiros: {pool} TON\n"
+            "💵 Ganancia tuya: {profit} TON\n"
+            "🏦 Reserva evento: {res} TON\n"
+            "👤 Usuarios: {users}\n"
+            "🪙 Total tokens: {total}\n\n"
+            "📢 *Tareas activas:* {ntasks}\n\n"
+            "Comandos admin:\n"
+            "/addtask @canal RECOMPENSA\n"
+            "/removetask @canal\n"
+            "/listtasks"
+        ),
+        "task_added":      "✅ Tarea añadida:\nCanal: {ch}\nRecompensa: {r} YOR",
+        "task_removed":    "🗑 Tarea eliminada: {ch}",
+        "task_not_found":  "❌ No se encontró tarea para {ch}",
+        "task_usage":      "Uso: /addtask @canal RECOMPENSA_YOR\nEjemplo: /addtask @micanal 30",
+        "no_permission":   "⛔ No tienes permiso",
     },
     "en": {
-        "choose_lang":      "🌐 Elige tu idioma / Choose your language:",
-        "welcome":          (
+        "choose_lang":     "🌐 Elige tu idioma / Choose your language:",
+        "welcome":         (
             "👋 Welcome to *YOR Mining Bot*!\n\n"
             "⛏ Mine YOR tokens for free\n"
             "💰 Earn real TON at the end of the event\n"
@@ -80,46 +98,61 @@ T = {
             "📌 Withdrawals happen *only at the end of the event*\n\n"
             "Use the menu below 👇"
         ),
-        "menu_title":       "📋 *Main Menu*\nChoose an option:",
-        "mine_cooldown":    "⏳ Wait *{s}s* to mine again",
-        "mine_success":     "⛏ +*{r}* {t}\n\n⚡ Buy a boost in the Shop to earn more",
-        "mine_event_over":  "❌ The event is over",
-        "balance_msg":      "🪙 *Your tokens:* {tok} {t}\n💰 *Estimated earnings:* {est} TON\n\n⏳ Paid at the end of the event",
-        "status_msg":       "📊 *Event Status*\n\n💰 Total pool: {pool} TON\n🪙 Mined tokens: {total}\n⏳ Time left: {tiempo}",
-        "ranking_title":    "🏆 *TOP 10 Miners*\n\n",
-        "ranking_row":      "{i}. `{u}` → {a} YOR\n",
-        "shop_title":       "🛒 *Boost Shop*\n\nChoose your boost and pay directly from Tonkeeper 👇",
-        "tasks_title":      "📋 *Available Tasks*\n\nComplete tasks to earn extra YOR:",
-        "task_channel":     "✅ Join the official channel (+{r} YOR)",
-        "task_ref":         "👥 Invite friends (+{r} YOR each)",
-        "task_done":        "✅ Task already completed",
-        "task_channel_ok":  "🎉 Task complete! +{r} {t} for joining the channel",
-        "task_channel_no":  "❌ You are not in the channel yet. Join first and verify again.",
-        "ref_title":        "👥 *Your referral link:*\n\n`{link}`\n\n💰 You earn *{r} YOR* per friend who joins\n👤 Total referrals: {count}",
-        "ref_bonus":        "🎉 {name} joined with your link! +{r} {t}",
-        "event_end_msg":    "🎉 *EVENT FINISHED*\n\n💰 You earned: *{amt} TON*\n\nThank you for participating 🚀",
-        "boost_ok":         "✅ *Payment confirmed*\n\n🚀 Boost x{m} active\n💰 Paid: {v} TON\n\n🔥 You are mining faster",
-        "admin_stats":      "🛠 *Admin Stats*\n\nWithdraw pool: {pool} TON\nOwner profit: {profit} TON\nEvent reserve: {res} TON\nUsers: {users}\nTotal tokens: {total}",
-        "lang_set":         "✅ Language set: English",
-        "btn_mine":         "⛏ Mine",
-        "btn_balance":      "💰 Balance",
-        "btn_shop":         "🛒 Shop",
-        "btn_tasks":        "📋 Tasks",
-        "btn_ranking":      "🏆 Ranking",
-        "btn_status":       "📊 Status",
-        "btn_referral":     "👥 Referrals",
-        "btn_verify":       "✅ Verify",
-        "btn_join":         "📢 Join Channel",
-        "btn_back":         "🔙 Back",
-        "btn_lang":         "🌐 Language",
+        "menu_title":      "📋 *Main Menu*\nChoose an option:",
+        "mine_cooldown":   "⏳ Wait *{s}s* to mine again",
+        "mine_success":    "⛏ +*{r}* {t}\n\n⚡ Buy a boost in the Shop to earn more",
+        "mine_event_over": "❌ The event is over",
+        "balance_msg":     "🪙 *Your tokens:* {tok} {t}\n💰 *Estimated earnings:* {est} TON\n\n⏳ Paid at the end of the event",
+        "status_msg":      "📊 *Event Status*\n\n💰 Total pool: {pool} TON\n🪙 Mined tokens: {total}\n⏳ Time left: {tiempo}",
+        "ranking_title":   "🏆 *TOP 10 Miners*\n\n",
+        "ranking_row":     "{i}. `{u}` → {a} YOR\n",
+        "shop_title":      "🛒 *Boost Shop*\n\nChoose your boost and pay directly from Tonkeeper 👇",
+        "tasks_title":     "📋 *Available Tasks*\n\nComplete tasks to earn extra YOR:\n\n",
+        "tasks_empty":     "📋 *Tasks*\n\nNo tasks available right now.\nCheck back soon 👀",
+        "task_ref":        "👥 Invite friends (+{r} YOR each)",
+        "task_done_label": "☑️",
+        "task_verify_btn": "✅ Verify #{n}",
+        "task_join_btn":   "📢 Join #{n}",
+        "task_channel_ok": "🎉 Task complete! +*{r} YOR* for joining {ch}",
+        "task_channel_no": "❌ You are not in the channel yet.\nJoin first then verify.",
+        "task_already":    "✅ Task already completed",
+        "ref_title":       "👥 *Your referral link:*\n\n`{link}`\n\n💰 You earn *{r} YOR* per friend\n👤 Referrals: {count}",
+        "ref_bonus":       "🎉 {name} joined with your link! +{r} {t}",
+        "event_end_msg":   "🎉 *EVENT FINISHED*\n\n💰 You earned: *{amt} TON*\n\nThank you for participating 🚀",
+        "boost_ok":        "✅ *Payment confirmed*\n\n🚀 Boost x{m} active\n💰 Paid: {v} TON\n\n🔥 You are mining faster",
+        "lang_set":        "✅ Language: English",
+        "btn_mine":        "⛏ Mine",
+        "btn_balance":     "💰 Balance",
+        "btn_shop":        "🛒 Shop",
+        "btn_tasks":       "📋 Tasks",
+        "btn_ranking":     "🏆 Ranking",
+        "btn_status":      "📊 Status",
+        "btn_referral":    "👥 Referrals",
+        "btn_back":        "🔙 Back",
+        "btn_lang":        "🌐 Language",
+        "admin_stats":     (
+            "🛠 *Admin Panel*\n\n"
+            "💰 Withdraw pool: {pool} TON\n"
+            "💵 Your profit: {profit} TON\n"
+            "🏦 Event reserve: {res} TON\n"
+            "👤 Users: {users}\n"
+            "🪙 Total tokens: {total}\n\n"
+            "📢 *Active tasks:* {ntasks}\n\n"
+            "Admin commands:\n"
+            "/addtask @channel REWARD\n"
+            "/removetask @channel\n"
+            "/listtasks"
+        ),
+        "task_added":      "✅ Task added:\nChannel: {ch}\nReward: {r} YOR",
+        "task_removed":    "🗑 Task removed: {ch}",
+        "task_not_found":  "❌ Task not found for {ch}",
+        "task_usage":      "Usage: /addtask @channel REWARD_YOR\nExample: /addtask @mychannel 30",
+        "no_permission":   "⛔ No permission",
     }
 }
 
-TASK_CHANNEL_REWARD = 50   # YOR por unirse al canal
-TASK_REF_REWARD     = 20   # YOR por cada referido
-
 # ─────────────────────────────────────────
-# 📦 CARGAR / GUARDAR DATOS
+# 📦 DATOS
 # ─────────────────────────────────────────
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -139,12 +172,12 @@ def load_data():
     d.setdefault("ref_count",     {})
     d.setdefault("task_done",     {})
     d.setdefault("lang",          {})
+    d.setdefault("paid_tasks",    [])
 
     if "event_end_time" not in d:
         d["event_end_time"] = time.time() + EVENT_DURATION
 
     d["total_tokens"] = sum(d["balances"].values())
-
     return d
 
 data = load_data()
@@ -155,8 +188,8 @@ def save():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-event_end_time  = data["event_end_time"]
-event_finished  = time.time() > event_end_time
+event_end_time = data["event_end_time"]
+event_finished = time.time() > event_end_time
 
 # ─────────────────────────────────────────
 # 🛠 HELPERS
@@ -164,7 +197,7 @@ event_finished  = time.time() > event_end_time
 def lang(uid: str) -> str:
     return data["lang"].get(str(uid), "es")
 
-def t(uid, key, **kwargs) -> str:
+def tx(uid, key, **kwargs) -> str:
     text = T[lang(uid)][key]
     return text.format(**kwargs) if kwargs else text
 
@@ -199,7 +232,7 @@ def main_menu(uid):
 
 def back_btn(uid):
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton(t(uid, "btn_back"), callback_data="menu")
+        InlineKeyboardButton(tx(uid, "btn_back"), callback_data="menu")
     ]])
 
 # ─────────────────────────────────────────
@@ -233,14 +266,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ):
             data["referrals"][uid] = ref_id
             data["ref_count"][ref_id] = data["ref_count"].get(ref_id, 0) + 1
-            data["balances"][ref_id] = data["balances"].get(ref_id, 0) + TASK_REF_REWARD
-            data["total_tokens"] += TASK_REF_REWARD
+            data["balances"][ref_id]  = data["balances"].get(ref_id, 0) + TASK_REF_REWARD
+            data["total_tokens"]      += TASK_REF_REWARD
             save()
             name = update.effective_user.first_name or uid
             try:
                 await context.bot.send_message(
                     chat_id=int(ref_id),
-                    text=t(ref_id, "ref_bonus", name=name, r=TASK_REF_REWARD, t=TOKEN_NAME),
+                    text=tx(ref_id, "ref_bonus", name=name, r=TASK_REF_REWARD, t=TOKEN_NAME),
                     parse_mode="Markdown"
                 )
             except Exception:
@@ -259,14 +292,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save()
 
     await update.message.reply_text(
-        t(uid, "welcome"),
+        tx(uid, "welcome"),
         parse_mode="Markdown",
         reply_markup=main_menu(uid)
     )
 
 async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if uid != ADMIN_ID:
+    if update.effective_user.id != ADMIN_ID:
         return
     await update.message.reply_text(
         T["es"]["admin_stats"].format(
@@ -275,9 +307,81 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             res    = round(data["event_reserve"], 4),
             users  = len(data["balances"]),
             total  = round(data["total_tokens"],  2),
+            ntasks = len(data["paid_tasks"]),
         ),
         parse_mode="Markdown"
     )
+
+async def cmd_addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text(T["es"]["no_permission"])
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text(T["es"]["task_usage"])
+        return
+
+    channel = context.args[0]
+    if not channel.startswith("@"):
+        channel = "@" + channel
+
+    try:
+        reward = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text(T["es"]["task_usage"])
+        return
+
+    link = f"https://t.me/{channel.lstrip('@')}"
+
+    for task in data["paid_tasks"]:
+        if task["channel"] == channel:
+            task["reward"] = reward
+            task["link"]   = link
+            save()
+            await update.message.reply_text(
+                f"✏️ Tarea actualizada:\nCanal: {channel}\nRecompensa: {reward} YOR"
+            )
+            return
+
+    data["paid_tasks"].append({"channel": channel, "link": link, "reward": reward})
+    save()
+    await update.message.reply_text(T["es"]["task_added"].format(ch=channel, r=reward))
+
+async def cmd_removetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text(T["es"]["no_permission"])
+        return
+
+    if not context.args:
+        await update.message.reply_text("Uso: /removetask @canal")
+        return
+
+    channel = context.args[0]
+    if not channel.startswith("@"):
+        channel = "@" + channel
+
+    before = len(data["paid_tasks"])
+    data["paid_tasks"] = [t for t in data["paid_tasks"] if t["channel"] != channel]
+
+    if len(data["paid_tasks"]) < before:
+        save()
+        await update.message.reply_text(T["es"]["task_removed"].format(ch=channel))
+    else:
+        await update.message.reply_text(T["es"]["task_not_found"].format(ch=channel))
+
+async def cmd_listtasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not data["paid_tasks"]:
+        await update.message.reply_text("📋 No hay tareas activas.")
+        return
+
+    text = "📋 *Tareas activas:*\n\n"
+    for i, task in enumerate(data["paid_tasks"], 1):
+        text += f"{i}. {task['channel']} → *{task['reward']} YOR*\n"
+
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 # ─────────────────────────────────────────
 # 🎛 CALLBACKS
@@ -311,7 +415,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if cd == "menu":
         await q.edit_message_text(
-            t(uid, "menu_title"),
+            tx(uid, "menu_title"),
             parse_mode="Markdown",
             reply_markup=main_menu(uid)
         )
@@ -319,16 +423,15 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if cd == "mine":
         if event_finished:
-            await q.edit_message_text(t(uid, "mine_event_over"), reply_markup=back_btn(uid))
+            await q.edit_message_text(tx(uid, "mine_event_over"), reply_markup=back_btn(uid))
             return
 
         now  = time.time()
-        last = data["last_mine"].get(uid, 0)
-        wait = 10 - (now - last)
+        wait = 10 - (now - data["last_mine"].get(uid, 0))
 
         if wait > 0:
             await q.edit_message_text(
-                t(uid, "mine_cooldown", s=int(wait)),
+                tx(uid, "mine_cooldown", s=int(wait)),
                 parse_mode="Markdown",
                 reply_markup=back_btn(uid)
             )
@@ -351,7 +454,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save()
 
         await q.edit_message_text(
-            t(uid, "mine_success", r=reward, t=TOKEN_NAME),
+            tx(uid, "mine_success", r=reward, t=TOKEN_NAME),
             parse_mode="Markdown",
             reply_markup=back_btn(uid)
         )
@@ -362,19 +465,18 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total  = data["total_tokens"]
         est    = round(data["withdraw_pool"] * tokens / total, 4) if total > 0 else 0
         await q.edit_message_text(
-            t(uid, "balance_msg", tok=round(tokens, 2), t=TOKEN_NAME, est=est),
+            tx(uid, "balance_msg", tok=round(tokens, 2), t=TOKEN_NAME, est=est),
             parse_mode="Markdown",
             reply_markup=back_btn(uid)
         )
         return
 
     if cd == "status":
-        remaining = event_end_time - time.time()
         await q.edit_message_text(
-            t(uid, "status_msg",
-              pool   = round(data["withdraw_pool"], 4),
-              total  = round(data["total_tokens"],  2),
-              tiempo = fmt_time(remaining)),
+            tx(uid, "status_msg",
+               pool   = round(data["withdraw_pool"], 4),
+               total  = round(data["total_tokens"],  2),
+               tiempo = fmt_time(event_end_time - time.time())),
             parse_mode="Markdown",
             reply_markup=back_btn(uid)
         )
@@ -382,9 +484,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if cd == "ranking":
         top  = sorted(data["balances"].items(), key=lambda x: x[1], reverse=True)[:10]
-        text = t(uid, "ranking_title")
+        text = tx(uid, "ranking_title")
         for i, (u, amt) in enumerate(top, 1):
-            text += t(uid, "ranking_row", i=i, u=u, a=round(amt, 2))
+            text += tx(uid, "ranking_row", i=i, u=u, a=round(amt, 2))
         await q.edit_message_text(text, parse_mode="Markdown", reply_markup=back_btn(uid))
         return
 
@@ -400,103 +502,21 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"x{v['mult']} — {v['price']} TON  ({fmt_time(v['time'])})",
                 url=url
             )])
-        keyboard.append([InlineKeyboardButton(t(uid, "btn_back"), callback_data="menu")])
+        keyboard.append([InlineKeyboardButton(tx(uid, "btn_back"), callback_data="menu")])
         await q.edit_message_text(
-            t(uid, "shop_title"),
+            tx(uid, "shop_title"),
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
 
     if cd == "tasks":
-        done  = data["task_done"].get(uid, [])
-        l     = lang(uid)
-        ch_label  = T[l]["task_done"] if "channel" in done else T[l]["task_channel"].format(r=TASK_CHANNEL_REWARD)
-        ref_label = T[l]["task_ref"].format(r=TASK_REF_REWARD)
+        tasks     = data["paid_tasks"]
+        done_list = data["task_done"].get(uid, [])
+        l         = lang(uid)
 
-        kb = []
-        if "channel" not in done:
-            kb.append([InlineKeyboardButton(T[l]["btn_join"],   url=CHANNEL_LINK)])
-            kb.append([InlineKeyboardButton(T[l]["btn_verify"], callback_data="verify_channel")])
-        kb.append([InlineKeyboardButton(T[l]["btn_referral"], callback_data="referral")])
-        kb.append([InlineKeyboardButton(T[l]["btn_back"],     callback_data="menu")])
-
-        text  = t(uid, "tasks_title") + "\n\n"
-        text += f"1. {ch_label}\n"
-        text += f"2. {ref_label}"
-
-        await q.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb))
-        return
-
-    if cd == "verify_channel":
-        try:
-            member    = await context.bot.get_chat_member(CHANNEL_ID, int(uid))
-            is_member = member.status in ("member", "administrator", "creator")
-        except Exception:
-            is_member = False
-
-        if is_member:
-            done = data["task_done"].setdefault(uid, [])
-            if "channel" not in done:
-                done.append("channel")
-                data["balances"][uid]  = round(data["balances"].get(uid, 0) + TASK_CHANNEL_REWARD, 2)
-                data["total_tokens"]   = round(data["total_tokens"] + TASK_CHANNEL_REWARD, 2)
-                save()
+        if not tasks:
             await q.edit_message_text(
-                t(uid, "task_channel_ok", r=TASK_CHANNEL_REWARD, t=TOKEN_NAME),
+                T[l]["tasks_empty"],
                 parse_mode="Markdown",
-                reply_markup=back_btn(uid)
-            )
-        else:
-            kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton(t(uid, "btn_join"),   url=CHANNEL_LINK)],
-                [InlineKeyboardButton(t(uid, "btn_verify"), callback_data="verify_channel")],
-                [InlineKeyboardButton(t(uid, "btn_back"),   callback_data="tasks")],
-            ])
-            await q.edit_message_text(t(uid, "task_channel_no"), reply_markup=kb)
-        return
-
-    if cd == "referral":
-        bot_info = await context.bot.get_me()
-        link     = f"https://t.me/{bot_info.username}?start={uid}"
-        count    = data["ref_count"].get(uid, 0)
-        await q.edit_message_text(
-            t(uid, "ref_title", link=link, r=TASK_REF_REWARD, count=count),
-            parse_mode="Markdown",
-            reply_markup=back_btn(uid)
-        )
-        return
-
-# ─────────────────────────────────────────
-# 🔍 WATCHER DE PAGOS TON
-# ─────────────────────────────────────────
-async def payment_watcher(app):
-    while True:
-        try:
-            r   = requests.get(API_URL, params={"address": TON_WALLET, "limit": 20}, timeout=10)
-            txs = r.json().get("result", [])
-
-            for tx in txs:
-                try:
-                    msg   = tx["in_msg"].get("message", "")
-                    value = int(tx["in_msg"]["value"]) / 1e9
-                    tx_id = tx["transaction_id"]["hash"]
-
-                    if tx_id in data["processed"]:
-                        continue
-
-                    if msg and "-" in msg:
-                        parts = msg.split("-")
-                        if len(parts) != 2:
-                            continue
-                        uid_str, lvl_str = parts
-                        if not uid_str.isdigit() or not lvl_str.isdigit():
-                            continue
-
-                        user_id = uid_str
-                        level   = int(lvl_str)
-
-                        if level not in boosts:
-                            continue
-                        b = boosts[level]
-     
+                reply_markup=ba
