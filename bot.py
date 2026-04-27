@@ -515,12 +515,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         done_list = data["task_done"].get(uid, [])
         l         = lang(uid)
 
-        if not tasks:
-            await q.edit_message_text(
-                T[l]["tasks_empty"],
-                parse_mode="Markdown",
-                reply_markup=ba
-                       = lang(uid)
+        
 
         if not tasks:
             await q.edit_message_text(
