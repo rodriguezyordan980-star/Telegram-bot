@@ -455,7 +455,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data["last_mine"][uid] = now
         reward = 1.0
-                boost_info = data["user_boost"].get(uid)
+                
+        boost_info = data["user_boost"].get(uid)
         if boost_info:
             mult, exp = boost_info
             if now < exp:
