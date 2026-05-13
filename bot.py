@@ -52,7 +52,7 @@ T = {
         "task_done_label": "☑️",
         "task_verify_btn": "✅ Verificar #{n}",
         "task_join_btn":   "📢 Unirse #{n}",
-        "task_channel_ok": "🎉 ¡Tarea completada! +*{r} YOR* por unirte a {ch}",
+                "task_channel_ok": "🎉 ¡Tarea completada! +*{r} YOR* por unirte a {ch}",
         "task_channel_no": "❌ Aún no estás en el canal.\nÚnete primero y vuelve a verificar.",
         "task_already":    "✅ Ya completaste esta tarea",
         "ref_title":       "👥 *Tu enlace de referido:*\n\n`{link}`\n\n💰 Ganas *{r} YOR* por cada amigo\n👤 Referidos: {count}",
@@ -104,7 +104,7 @@ T = {
         "mine_event_over": "❌ The event is over",
         "balance_msg":     "🪙 *Your tokens:* {tok} {t}\n💰 *Estimated earnings:* {est} TON\n\n⏳ Paid at the end of the event",
         "status_msg":      "📊 *Event Status*\n\n💰 Total pool: {pool} TON\n🪙 Mined tokens: {total}\n⏳ Time left: {tiempo}",
-        "ranking_title":   "🏆 *TOP 10 Miners*\n\n",
+                "ranking_title":   "🏆 *TOP 10 Miners*\n\n",
         "ranking_row":     "{i}. `{u}` → {a} YOR\n",
         "shop_title":      "🛒 *Boost Shop*\n\nChoose your boost and pay directly from Tonkeeper 👇",
         "tasks_title":     "📋 *Available Tasks*\n\nComplete tasks to earn extra YOR:\n\n",
@@ -157,7 +157,7 @@ T = {
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
-            d = json.load(f)
+                        d = json.load(f)
     else:
         d = {}
 
@@ -172,6 +172,8 @@ def load_data():
     d.setdefault("ref_count",     {})
     d.setdefault("task_done",     {})
     d.setdefault("lang",          {})
+    # Tareas de canales de pago
+    # Formato: [{"channel": "@canal", "link": "https://t.me/canal", "reward": 30}, ...]
     d.setdefault("paid_tasks",    [])
 
     if "event_end_time" not in d:
@@ -215,7 +217,7 @@ def main_menu(uid):
             InlineKeyboardButton(T[l]["btn_mine"],     callback_data="mine"),
             InlineKeyboardButton(T[l]["btn_balance"],  callback_data="balance"),
         ],
-        [
+            [
             InlineKeyboardButton(T[l]["btn_shop"],     callback_data="shop"),
             InlineKeyboardButton(T[l]["btn_tasks"],    callback_data="tasks"),
         ],
@@ -274,7 +276,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=int(ref_id),
                     text=tx(ref_id, "ref_bonus", name=name, r=TASK_REF_REWARD, t=TOKEN_NAME),
-                    parse_mode="Markdown"
+                          parse_mode="Markdown"
                 )
             except Exception:
                 pass
@@ -297,6 +299,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu(uid)
     )
 
+# ── /admin ───────────────────────────────
 async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -312,6 +315,7 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+# ── /addtask @canal RECOMPENSA ────────────
 async def cmd_addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text(T["es"]["no_permission"])
@@ -332,7 +336,8 @@ async def cmd_addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     link = f"https://t.me/{channel.lstrip('@')}"
-
+    
+    # Si ya existe, actualizar
     for task in data["paid_tasks"]:
         if task["channel"] == channel:
             task["reward"] = reward
@@ -343,10 +348,17 @@ async def cmd_addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    data["paid_tasks"].append({"channel": channel, "link": link, "reward": reward})
+    data["paid_tasks"].append({
+        "channel": channel,
+        "link":    link,
+        "reward":  reward
+    })
     save()
-    await update.message.reply_text(T["es"]["task_added"].format(ch=channel, r=reward))
+    await update.message.reply_text(
+        T["es"]["task_added"].format(ch=channel, r=reward)
+    )
 
+# ── /removetask @canal ────────────────────
 async def cmd_removetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text(T["es"]["no_permission"])
@@ -369,6 +381,7 @@ async def cmd_removetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(T["es"]["task_not_found"].format(ch=channel))
 
+# ── /listtasks ────────────────────────────
 async def cmd_listtasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -392,6 +405,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cd  = q.data
     await q.answer()
 
+    # ── Idioma ──────────────────────────
     if cd in ("lang_es", "lang_en"):
         chosen = cd.split("_")[1]
         data["lang"][uid] = chosen
@@ -413,6 +427,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(T["es"]["choose_lang"], reply_markup=kb)
         return
 
+    # ── Menú ────────────────────────────
     if cd == "menu":
         await q.edit_message_text(
             tx(uid, "menu_title"),
@@ -421,6 +436,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Minar ───────────────────────────
     if cd == "mine":
         if event_finished:
             await q.edit_message_text(tx(uid, "mine_event_over"), reply_markup=back_btn(uid))
@@ -439,8 +455,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data["last_mine"][uid] = now
         reward = 1.0
-
-        boost_info = data["user_boost"].get(uid)
+                boost_info = data["user_boost"].get(uid)
         if boost_info:
             mult, exp = boost_info
             if now < exp:
@@ -460,6 +475,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Balance ─────────────────────────
     if cd == "balance":
         tokens = data["balances"].get(uid, 0)
         total  = data["total_tokens"]
@@ -471,6 +487,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Estado ──────────────────────────
     if cd == "status":
         await q.edit_message_text(
             tx(uid, "status_msg",
@@ -482,6 +499,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Ranking ─────────────────────────
     if cd == "ranking":
         top  = sorted(data["balances"].items(), key=lambda x: x[1], reverse=True)[:10]
         text = tx(uid, "ranking_title")
@@ -490,11 +508,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(text, parse_mode="Markdown", reply_markup=back_btn(uid))
         return
 
+    # ── Tienda ──────────────────────────
     if cd == "shop":
         keyboard = []
         for k, v in boosts.items():
             amount = int(v["price"] * 1e9)
-            url    = (
+                        url    = (
                 f"https://app.tonkeeper.com/transfer/{TON_WALLET}"
                 f"?amount={amount}&text={uid}-{k}"
             )
@@ -510,12 +529,11 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ── Tareas ──────────────────────────
     if cd == "tasks":
         tasks     = data["paid_tasks"]
         done_list = data["task_done"].get(uid, [])
         l         = lang(uid)
-
-        
 
         if not tasks:
             await q.edit_message_text(
@@ -555,9 +573,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(kb)
-        )
+              )
         return
 
+    # ── Verificar tarea canal ────────────
     if cd.startswith("verify_"):
         try:
             idx  = int(cd.split("_")[1])
@@ -594,13 +613,14 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             l  = lang(uid)
             kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton(T[l]["task_join_btn"].format(n=idx+1),   url=task["link"])],
-                [InlineKeyboardButton(T[l]["task_verify_btn"].format(n=idx+1), callback_data=cd)],
-                [InlineKeyboardButton(T[l]["btn_back"],                         callback_data="tasks")],
+                [InlineKeyboardButton(T[l]["task_join_btn"].format(n=idx+1),    url=task["link"])],
+                [InlineKeyboardButton(T[l]["task_verify_btn"].format(n=idx+1),  callback_data=cd)],
+                [InlineKeyboardButton(T[l]["btn_back"],                          callback_data="tasks")],
             ])
             await q.edit_message_text(tx(uid, "task_channel_no"), reply_markup=kb)
         return
 
+    # ── Referidos ───────────────────────
     if cd == "referral":
         bot_info = await context.bot.get_me()
         link     = f"https://t.me/{bot_info.username}?start={uid}"
@@ -609,7 +629,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tx(uid, "ref_title", link=link, r=TASK_REF_REWARD, count=count),
             parse_mode="Markdown",
             reply_markup=back_btn(uid)
-        )
+                )
         return
 
 # ─────────────────────────────────────────
